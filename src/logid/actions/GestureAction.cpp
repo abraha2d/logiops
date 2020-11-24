@@ -36,15 +36,21 @@ GestureAction::Direction GestureAction::toDirection(std::string direction)
         return Left;
     else if(direction == "right")
         return Right;
+    else if(direction == "scrollup")
+        return ScrollUp;
+    else if(direction == "scrolldown")
+        return ScrollDown;
     else if(direction == "none")
         return None;
     else
         throw std::invalid_argument("direction");
 }
 
-GestureAction::Direction GestureAction::toDirection(int16_t x, int16_t y)
+GestureAction::Direction GestureAction::toDirection(int16_t x, int16_t y, int16_t s)
 {
-    if(isVertical())
+    if(isScroll())
+        return s > 0 ? ScrollUp : ScrollDown;
+    else if(isVertical())
         return y < 0 ? Up : Down;
     else if(isHorizontal())
         return x < 0 ? Left : Right;
@@ -69,7 +75,7 @@ void GestureAction::release()
 {
     _pressed = false;
 
-    Direction d = toDirection(_x, _y);
+    Direction d = toDirection(_x, _y, _s);
 
     for(auto& gesture : _config.gestures()) {
         gesture.second->release(gesture.first == d);
@@ -79,6 +85,15 @@ void GestureAction::release()
         _config.noneAction()->press();
         _config.noneAction()->release();
     }
+}
+
+bool GestureAction::isScroll()
+{
+    auto scrollUp = _config.gestures().find(ScrollUp);
+    bool isScrollUp = scrollUp == _config.gestures().end() ? false : scrollUp->second->metThreshold();
+    auto scrollDown = _config.gestures().find(ScrollDown);
+    bool isScrollDown = scrollDown == _config.gestures().end() ? false : scrollDown->second->metThreshold();
+    return isScrollUp || isScrollDown;
 }
 
 bool GestureAction::isVertical()
@@ -99,38 +114,49 @@ bool GestureAction::isHorizontal()
     return isLeft || isRight;
 }
 
-void GestureAction::move(int16_t x, int16_t y)
+void GestureAction::move3D(int16_t x, int16_t y, int16_t s)
 {
     auto gesture = _config.gestures().end();
     int16_t axis = 0;
 
+    bool isS = isScroll();
     bool isV = isVertical();
     bool isH = isHorizontal();
 
-    if (!isV && x < 0) {
+    if (!isS && !isV && x < 0) {
         gesture = _config.gestures().find(Left);
         axis = -x;
     }
 
-    if (!isV && x > 0) {
+    if (!isS && !isV && x > 0) {
         gesture = _config.gestures().find(Right);
         axis = x;
     }
 
-    if (!isH && y < 0) {
+    if (!isS && !isH && y < 0) {
         gesture = _config.gestures().find(Up);
         axis = -y;
     }
 
-    if (!isH && y > 0) {
+    if (!isS && !isH && y > 0) {
         gesture = _config.gestures().find(Down);
         axis = y;
+    }
+
+    if (!isV && !isH && s > 0) {
+        gesture = _config.gestures().find(ScrollUp);
+        axis = s;
+    }
+
+    if (!isV && !isH && s < 0) {
+        gesture = _config.gestures().find(ScrollDown);
+        axis = -s;
     }
 
     if (gesture != _config.gestures().end())
         gesture->second->move(axis);
 
-    _x += x; _y += y;
+    _x += x; _y += y; _s += s;
 }
 
 uint8_t GestureAction::reprogFlags() const

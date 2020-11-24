@@ -56,6 +56,11 @@ namespace actions {
             // Suppress unused warning
             (void)x; (void)y;
         }
+        virtual void scroll(int16_t s)
+        {
+            // Suppress unused warning
+            (void)s;
+        };
 
         virtual bool pressed()
         {
